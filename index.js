@@ -1,148 +1,91 @@
-import { useMemo, useState } from 'react';
+const fs = require('fs');
+const readline = require('readline');
 
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/router';
+const re = new RegExp(
+  /<(?!\/|html|head|title|meta|script|href|style|link|noscript|boolean)(?![^>]*\btest-id\b)>*[^<]*[^}]/,
+  'g'
+);
 
-import { Box, useSnackbar } from '@tradersclub/core-ui';
+const varDeclaration = new RegExp(
+  /^(\t)?(\s)*(const|var|let) \w+ = [a-zA-Z]/,
+  'g'
+);
 
-import LocalHeader from '@global-layouts/Default/LocalHeader';
+const enclosing = new RegExp(/(\/?>}|\/?>)[\n ]*$/, '');
 
-import useDataLayer from '@global-hooks/useDataLayer';
-import { useErrorMessage } from '@global-hooks/useErrorMessage';
+exports.parseTestId = function () {
+  const file = readline.createInterface({
+    input: fs.createReadStream(process.argv[2]),
+    output: process.stdout,
+    terminal: false,
+  });
 
-import { useCreateIdea, useThreads, useUpdateIdea } from '@services/community/ideas';
-import { createUseFeedIdeasKey, createUseThreadKey } from '@services/community/ideas/keys';
-import { useCurrentUser } from '@services/community/user';
+  var newFile = '';
+  var newLine = '';
+  var openTag = false;
+  var lineNumber = 0;
 
-import { CategoryType, Idea } from '@entities/Idea';
+  file.on('line', (line) => {
+    lineNumber += 1;
+    var offsetChanges = 0;
+    const hasEnclosing = enclosing.test(line);
 
-import ModalExitForm from '@ideas/components/Form/ModalExitForm';
-import IdeasAvatar from '@ideas/components/IdeasAvatar';
-import useRedirectIdeas from '@ideas/hooks/useRedirectIdeas';
-import { useCategoryIdeas } from '@ideas/stores/useCategoryIdeas';
-
-import FreeIdea from './FreeIdea';
-import TradeIdea from './TradeIdea';
-
-const Form = () => {
-  const { data: currentUser } = useCurrentUser();
-  const { pushEvent } = useDataLayer();
-  const queryClient = useQueryClient();
-  const { query } = useRouter();
-  const { openErrorMessage } = useErrorMessage();
-  const setCategory = useCategoryIdeas((state) => state.setCategory);
-  const { openSnackbar } = useSnackbar();
-  const { redirect } = useRedirectIdeas();
-
-  const { type, sequence } = query;
-  const ideaId = query.ideaId as string;
-  const isEdit = Boolean(ideaId);
-  const isSequence = Boolean(sequence);
-
-  const [openModalExitForm, setOpenModalExitForm] = useState<boolean>(false);
-  const isSimplePublication = useMemo<boolean>(() => Boolean(type === `free`), [type]);
-
-  const headerTitle = useMemo(() => {
-    if (isSequence) {
-      return `Adicionar sequência`;
+    if (!re.test(line) && !openTag) {
+      newFile += line + '\n';
+      return;
     }
 
-    if (isEdit) {
-      return `Editar Idea`;
+    if (varDeclaration.test(line) && !openTag) {
+      newFile += line + '\n';
+      return;
     }
 
-    return `Adicionar Idea`;
-  }, [isSequence, isEdit]);
+    if (!hasEnclosing) {
+      openTag = true;
+      newLine += line + '\n';
+      return;
+    }
 
-  const { data, isInitialLoading } = useThreads(ideaId, {
-    onError: (error) => openErrorMessage(error),
-    enabled: isEdit && !isSequence,
+    newLine += line;
+    re.lastIndex = 0;
+    const matches = newLine.matchAll(re);
+
+    for (const match of matches) {
+      var newTag = match[0];
+      const start = match.index;
+      const end = newTag.length;
+
+      const beforeClose = newTag.substring(end - 2, end - 1);
+      const newTestId = `test-id="${Math.random()
+        .toString(16)
+        .substring(2, 12)}"`;
+
+      var positionCut = end - 1;
+      if (beforeClose === '/') positionCut -= 1;
+
+      newTag = [
+        newTag.slice(0, positionCut),
+        newTag.slice(positionCut - 1, positionCut) === ' ' ? '' : ' ', // Add space in case test-id is connected to attribute or tag
+        newTestId,
+        newTag.slice(positionCut),
+      ].join('');
+
+      const concatLine = [
+        newLine.slice(0, start + offsetChanges),
+        newTag,
+        newLine.slice(offsetChanges + start + match[0].length),
+      ].join('');
+
+      offsetChanges = concatLine.length - line.length;
+      newLine = concatLine;
+    }
+
+    newFile += newLine + '\n';
+    newLine = '';
+    openTag = false;
   });
 
-  const idea = useMemo<Idea | undefined>(() => (isEdit ? data : undefined), [data, isEdit]);
-
-  const { mutate: createIdea } = useCreateIdea({
-    onSuccess: (res) => {
-      openSnackbar(`Publicação feita! Você pode editar ou excluir sua Idea em até 15min.`, {
-        severity: `success`,
-      });
-      queryClient.resetQueries(createUseFeedIdeasKey(CategoryType.All));
-      setCategory(CategoryType.All);
-      redirect();
-      pushEvent(`publicou_idea_publicacao_livre`, {
-        id_do_autor: res.user_id,
-        id_post: res.id,
-        tipo_do_post: res.category === CategoryType.Publications ? `publicacao_livre` : `idea`,
-      });
-    },
-    onError: (error) => openErrorMessage(error),
+  file.on('close', () => {
+    fs.writeFile('./' + process.argv[2], newFile, () => {});
   });
-
-  const { mutate: updateIdea } = useUpdateIdea({
-    onSuccess: () => {
-      openSnackbar(`Edição feita! Você pode editar ou excluir sua Idea em até 15min.`, {
-        severity: `success`,
-      });
-
-      queryClient.resetQueries(createUseFeedIdeasKey(CategoryType.All));
-      queryClient.invalidateQueries(createUseThreadKey(ideaId));
-      if (idea?.idea_root) {
-        queryClient.removeQueries(createUseThreadKey(idea?.idea_root));
-      }
-      setCategory(CategoryType.All);
-      redirect();
-    },
-    onError: (error) => openErrorMessage(error),
-  });
-
-  if (isInitialLoading) {
-    return null;
-  }
-
-  return (
-    <Box
-      backgroundColor="surface.base.fill"
-      display="flex"
-      flex="1"
-      flexDirection="column"
-      position="relative"
-      overflow="auto"
-      borderTop="1px solid"
-      borderColor="surface.base.border"
-    >
-      <LocalHeader
-        title={headerTitle}
-        displayBackButton={{ default: `block`, l: `block` }}
-        onBack={() => setOpenModalExitForm(true)}
-      />
-      <Box display="flex" alignItems="center" flexDirection="column" overflow="auto">
-        <Box paddingX={16}>
-          <Box
-            backgroundColor={{ default: `transparent`, m: `surface.base.fill` }}
-            borderColor="surface.base.border"
-            borderRadius="m"
-            borderStyle="solid"
-            borderWidth={{ default: 0, m: 1 }}
-            marginY={16}
-            marginX="auto"
-            padding={{ default: 0, m: 32 }}
-            width={{
-              default: `100%`,
-              xl: 1003,
-            }}
-          >
-            {currentUser?.user && <IdeasAvatar user={currentUser?.user} size="md" />}
-            {isSimplePublication ? (
-              <FreeIdea idea={idea} onCreate={createIdea} onUpdate={updateIdea} />
-            ) : (
-              <TradeIdea idea={idea} onCreate={createIdea} onUpdate={updateIdea} />
-            )}
-          </Box>
-        </Box>
-      </Box>
-      <ModalExitForm isOpen={openModalExitForm} onClose={() => setOpenModalExitForm(false)} />
-    </Box>
-  );
 };
-
-export default Form;

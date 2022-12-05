@@ -109,14 +109,14 @@ const Form = () => {
       overflow="auto"
       borderTop="1px solid"
       borderColor="surface.base.border"
-    test-id="6c205a95c7">
+    >
       <LocalHeader
         title={headerTitle}
         displayBackButton={{ default: `block`, l: `block` }}
         onBack={() => setOpenModalExitForm(true)}
-      test-id="ff26c987aa"/>
-      <Box display="flex" alignItems="center" flexDirection="column" overflow="auto" test-id="009187272e">
-        <Box paddingX={16} test-id="f64ce413f7">
+      />
+      <Box display="flex" alignItems="center" flexDirection="column" overflow="auto">
+        <Box paddingX={16}>
           <Box
             backgroundColor={{ default: `transparent`, m: `surface.base.fill` }}
             borderColor="surface.base.border"
@@ -130,17 +130,17 @@ const Form = () => {
               default: `100%`,
               xl: 1003,
             }}
-          test-id="0c5615f516">
-            {currentUser?.user && <IdeasAvatar user={currentUser?.user} size="md" test-id="ba552c809f"/>}
+          >
+            {currentUser?.user && <IdeasAvatar user={currentUser?.user} size="md" />}
             {isSimplePublication ? (
-              <FreeIdea idea={idea} onCreate={createIdea} onUpdate={updateIdea} test-id="fb853c9b0c"/>
+              <FreeIdea idea={idea} onCreate={createIdea} onUpdate={updateIdea} />
             ) : (
               <TradeIdea idea={idea} onCreate={createIdea} onUpdate={updateIdea} test-id="f35b2345cf"/>
             )}
           </Box>
         </Box>
       </Box>
-      <ModalExitForm isOpen={openModalExitForm} onClose={() => setOpenModalExitForm(false)} test-id="17495aad32"/>
+      <ModalExitForm isOpen={openModalExitForm} onClose={() => setOpenModalExitForm(false)} />
     </Box>
   );
 };
