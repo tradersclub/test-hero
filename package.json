@@ -1,0 +1,19 @@
+{
+  "name": "test-hero",
+  "version": "0.0.1",
+  "description": "A module to make your test IDs flow in the project.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tradersclub/test-hero.git"
+  },
+  "author": "Marcelo Bissuh <marcelo.bissuh@tc.com.br>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tradersclub/test-hero/issues"
+  },
+  "homepage": "https://github.com/tradersclub/test-hero#readme"
+}
